@@ -20,7 +20,12 @@ This document outlines a draft specification for AATEA Solutions to handle HTTP 
 **Example Request:**
 
 ```
-POST /register?node=00:14:22:01:23:45&identifier=Exhibit_A
+POST /register HTTP/1.1
+Host: yourserver.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 43
+
+node=00:14:22:01:23:45&identifier=Exhibit_A
 ```
 
 **Responses:**
@@ -44,7 +49,12 @@ POST /register?node=00:14:22:01:23:45&identifier=Exhibit_A
 **Example Request:**
 
 ```
-POST /scan?node=00:14:22:01:23:45&tag=123456
+POST /scan HTTP/1.1
+Host: yourserver.com
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 33
+
+node=00:14:22:01:23:45&tag=123456
 ```
 
 **Responses:**
@@ -74,7 +84,3 @@ https://example.com/trip/123456
 - All requests are sent via POST, as the microcontrollers are only capable of minimal processing.
 - Responses should be kept minimal, ideally just indicating success or failure with the appropriate status code.
 - The controllers are only capable of displaying a success, waiting, or a failure to the visitor with blinking lights.
-
----
-
-By following this specification, the web developer can set up the necessary endpoints to handle the scanner hardware interactions efficiently.

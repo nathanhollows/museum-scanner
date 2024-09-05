@@ -1,7 +1,5 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
-#include "../config/config.h"
-#include "../config/secrets.h"
 
 #define LED_PIN D1  // Pin where the LED is connected (D1 corresponds to GPIO5)
 
@@ -15,8 +13,8 @@ void handleRoot() {
 }
 
 void handleBlink() {
-  blinkLED();
   server.send(200, "text/plain", "LED blinked!");
+  blinkLED();
 }
 
 void setup() {
@@ -45,10 +43,13 @@ void loop() {
 }
 
 void blinkLED() {
-  for (int i = 0; i < 3; i++) {  // Blink the LED 3 times
-    digitalWrite(LED_PIN, HIGH);
-    delay(200);
-    digitalWrite(LED_PIN, LOW);
-    delay(200);
-  }
+    for (int i = 0; i < 256; i++) {
+      analogWrite(LED_PIN, 1 / (1 + exp(((i / 21) - 6) * -1)) * 255);
+      delay(150 / 256);
+    }
+  delay(100);
+    for (int i = 256; i >= 0; i--) {
+      analogWrite(LED_PIN, 1 / (1 + exp(((i / 21) - 6) * -1)) * 255);
+      delay(150 / 256);
+    }
 }

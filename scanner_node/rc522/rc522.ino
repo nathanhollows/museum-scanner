@@ -5,51 +5,43 @@
 
 #define RST_PIN   D4     // RST-PIN for MFRC522
 #define SS_PIN    D2     // SDA-PIN for MFRC522
-#define BLINK_PIN LED_BUILTIN     // LED pin
+#define BLINK_PIN D3     // LED pin
 
-const char *ssid = "ESP8266_AP";  // SSID of the WiFi network
-const char *password = "12345678";  // Password of the WiFi network
-const char *serverIP = "192.168.4.1";  // IP address of the server
-const int serverPort = 80;  // Port of the server
+const char *ssid = "";  // SSID of the WiFi network
+const char *password = "";  // Password of the WiFi network
+const char *server = "";  // Address of the server (no trailing slash)
+const char *location = ""; // Unique location ID (must match content file but without `.md`)
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance
 
-void blink() {
-  digitalWrite(BLINK_PIN, HIGH);
-  delay(50);
-  digitalWrite(BLINK_PIN, LOW);
-  delay(50);
-  digitalWrite(BLINK_PIN, HIGH);
-  delay(50);
-  digitalWrite(BLINK_PIN, LOW);
-  delay(50);
-  digitalWrite(BLINK_PIN, HIGH);
-  delay(50);
-  digitalWrite(BLINK_PIN, LOW);
-  delay(50);
-  digitalWrite(BLINK_PIN, HIGH);
-}
-
-void sendBlinkRequest(String boardID, String tagID) {
-  WiFiClient client;
-  HTTPClient http;
-
-  String url = String("http://") + serverIP + ":" + serverPort + "/blink?boardID=" + boardID + "&tagID=" + tagID;
-
-  Serial.print("Sending request to: ");
-  Serial.println(url);
-
-  if (http.begin(client, url)) {
-    int httpCode = http.GET();
-
-    if (httpCode > 0) {
-      Serial.printf("HTTP GET request sent, response code: %d\n", httpCode);
-    } else {
-      Serial.printf("HTTP GET request failed, error: %s\n", http.errorToString(httpCode).c_str());
+// fadeLED functions
+//
+// These functions blink the LED using an S-curve function
+// which is a sigmoid function that maps the input value  
+// to a value between 0 and 255.
+//
+// This approach is useful as human eyes perceive light
+// intensity in a non-linear way, and the S-curve function
+// provides a more natural-looking blink.
+//
+// A too-high duration value will cause the blink to be
+// jittery.
+//
+// The formula for the S-curve function is:
+// =1/(1+EXP(((A2/21)-6)*-1))*255
+// https://electronics.stackexchange.com/a/11100
+// This function blinks the LED off using an S-curve function
+void fadeLED(int duration, int startValue, int endValue) {
+  if (startValue < endValue) {
+    for (int i = startValue; i < endValue; i++) {
+      analogWrite(BLINK_PIN, 1 / (1 + exp(((i / 21) - 6) * -1)) * 255);
+      delay(duration / 256);
     }
-    http.end();
   } else {
-    Serial.println("Unable to connect to server");
+    for (int i = startValue; i >= endValue; i--) {
+      analogWrite(BLINK_PIN, 1 / (1 + exp(((i / 21) - 6) * -1)) * 255);
+      delay(duration / 256);
+    }
   }
 }
 
@@ -62,6 +54,8 @@ void connectToWiFi() {
   int retryInterval = 500;  // Start with 500ms interval
 
   while (WiFi.status() != WL_CONNECTED) {
+    fadeLED(250, 0, 256); 
+    fadeLED(250, 256, 0); 
     delay(retryInterval);
     Serial.print(".");
     
@@ -72,11 +66,13 @@ void connectToWiFi() {
     }
     
     if (millis() - startAttemptTime > 60000) {
+      digitalWrite(BLINK_PIN, LOW);
       // After 60 seconds of attempts, restart the device
       Serial.println("Restarting device due to prolonged connection attempts...");
       ESP.restart();
     }
   }
+  digitalWrite(BLINK_PIN, HIGH);
   
   Serial.println("");
   Serial.println("WiFi connected");
@@ -84,13 +80,43 @@ void connectToWiFi() {
   Serial.println(WiFi.localIP());
 }
 
+void sendBlinkRequest(String boardID, String tagID) {
+  WiFiClient client;
+  HTTPClient http;
+
+  String url = String(server) + "/scan?location=" + String(location) + "&tag=" + tagID;
+
+  Serial.print("Sending request to: ");
+  Serial.println(url);
+
+  if (http.begin(client, url)) {
+    fadeLED(250, 256, 0); 
+    fadeLED(100, 0, 256); 
+    fadeLED(100, 256, 0); 
+    fadeLED(100, 0, 256); 
+    fadeLED(200, 256, 0); 
+    int httpCode = http.GET();
+
+    if (httpCode > 0) {
+      Serial.printf("HTTP GET request sent, response code: %d\n", httpCode);
+    } else {
+      Serial.printf("HTTP GET request failed, error: %s\n", http.errorToString(httpCode).c_str());
+    }
+    http.end();
+    fadeLED(400, 0, 256); 
+  } else {
+    Serial.println("Unable to connect to server");
+  }
+}
+
 void setup(void) {
   pinMode(BLINK_PIN, OUTPUT);
-  digitalWrite(BLINK_PIN, HIGH);
+  digitalWrite(BLINK_PIN, LOW);
 
   Serial.begin(9600);
   Serial.println("Hello!");
 
+  fadeLED(250, 0, 256); 
   connectToWiFi();  // Connect to WiFi
 
   SPI.begin();           // Init SPI bus
@@ -120,8 +146,6 @@ void loop(void) {
   }
   Serial.println();
 
-  blink();
-  
   // Send board ID and tag ID
   String boardID = WiFi.macAddress();
   sendBlinkRequest(boardID, tagID);
